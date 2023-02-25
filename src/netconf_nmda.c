@@ -110,9 +110,9 @@ np2srv_rpc_getdata_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), const 
     NC_WD_MODE nc_wd;
     sr_get_options_t get_opts = 0;
 
-    if (np_ignore_rpc(session, event, &rc)) {
+    if (NP_IGNORE_RPC(session, event)) {
         /* ignore in this case */
-        return rc;
+        return SR_ERR_OK;
     }
 
     /* get default value for with-defaults */
@@ -139,7 +139,8 @@ np2srv_rpc_getdata_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), const 
     node = nodeset->count ? nodeset->dnodes[0] : NULL;
     ly_set_free(nodeset, NULL);
     if (node && !strcmp(node->schema->name, "subtree-filter")) {
-        if ((rc = op_filter_create_subtree(((struct lyd_node_any *)node)->value.tree, session, &filter))) {
+        if (op_filter_create_subtree(((struct lyd_node_any *)node)->value.tree, &filter)) {
+            rc = SR_ERR_INTERNAL;
             goto cleanup;
         }
     } else {
@@ -204,7 +205,6 @@ np2srv_rpc_getdata_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), const 
 
     /* add output */
     if (lyd_new_any(output, NULL, "data", data, 1, LYD_ANYDATA_DATATREE, 1, NULL)) {
-        rc = SR_ERR_LY;
         goto cleanup;
     }
     data = NULL;
@@ -229,9 +229,9 @@ np2srv_rpc_editdata_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), const
     const char *defop;
     int rc = SR_ERR_OK;
 
-    if (np_ignore_rpc(session, event, &rc)) {
+    if (NP_IGNORE_RPC(session, event)) {
         /* ignore in this case */
-        return rc;
+        return SR_ERR_OK;
     }
 
     /* get know which datastore is being affected */
@@ -295,10 +295,6 @@ np2srv_rpc_editdata_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), const
     }
 
 cleanup:
-    if (user_sess) {
-        /* discard any changes that possibly failed to be applied */
-        sr_discard_changes(user_sess->sess);
-    }
     lyd_free_siblings(config);
     np_release_user_sess(user_sess);
     return rc;

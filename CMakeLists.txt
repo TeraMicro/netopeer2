@@ -12,9 +12,6 @@ include(CheckIncludeFile)
 include(UseCompat)
 include(SourceFormat)
 include(GenCoverage)
-if(POLICY CMP0028)
-    cmake_policy(SET CMP0028 NEW)
-endif()
 if(POLICY CMP0075)
     cmake_policy(SET CMP0075 NEW)
 endif()
@@ -46,24 +43,24 @@ endif()
 # Generic version of not only the library. Major version is reserved for really big changes of the project,
 # minor version changes with added functionality (new tool, functionality of the tool or library, ...) and
 # micro version is changed with a set of small changes or bugfixes anywhere in the project.
-set(NP2SRV_VERSION 2.1.53)
+set(NP2SRV_VERSION 2.1.38)
 
 # libyang required version
-set(LIBYANG_DEP_VERSION 2.1.45)
-set(LIBYANG_DEP_SOVERSION 2.31.9)
+set(LIBYANG_DEP_VERSION 2.0.233)
+set(LIBYANG_DEP_SOVERSION 2.22.6)
 set(LIBYANG_DEP_SOVERSION_MAJOR 2)
 
 # libnetconf2 required version
-set(LIBNETCONF2_DEP_VERSION 2.1.27)
-set(LIBNETCONF2_DEP_SOVERSION 3.5.3)
+set(LIBNETCONF2_DEP_VERSION 2.1.20)
+set(LIBNETCONF2_DEP_SOVERSION 3.4.0)
 set(LIBNETCONF2_DEP_SOVERSION_MAJOR 3)
 
 # sysrepo required version
-set(SYSREPO_DEP_VERSION 2.2.47)
-set(SYSREPO_DEP_SOVERSION 7.14.7)
+set(SYSREPO_DEP_VERSION 2.2.2)
+set(SYSREPO_DEP_SOVERSION 7.10.2)
 set(SYSREPO_DEP_SOVERSION_MAJOR 7)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -std=c99")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -std=gnu99")
 
 #
 # options
@@ -77,7 +74,7 @@ endif()
 option(ENABLE_COVERAGE "Build code coverage report from tests" OFF)
 option(BUILD_CLI "Build and install neotpeer2-cli" ON)
 option(ENABLE_URL "Enable URL capability" ON)
-set(THREAD_COUNT 3 CACHE STRING "Number of threads accepting new sessions and handling requests")
+set(THREAD_COUNT 5 CACHE STRING "Number of threads accepting new sessions and handling requests")
 set(POLL_IO_TIMEOUT 10 CACHE STRING "Timeout in milliseconds of polling sessions for new data. It is also used for synchronization of low level IO such as sending a reply while a notification is being sent")
 set(YANG_MODULE_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATADIR}/yang/modules/netopeer2" CACHE STRING "Directory where to copy the YANG modules to")
 set(SCRIPT_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATADIR}/netopeer2" CACHE STRING "Directory where to copy the install scripts to")
@@ -155,9 +152,9 @@ set(FORMAT_SRC
 # checks
 #
 
+# lnc2 support for np2srv thread count
 find_package(PkgConfig)
 if(PKG_CONFIG_FOUND)
-    # lnc2 support for np2srv thread count
     execute_process(COMMAND ${PKG_CONFIG_EXECUTABLE} "--variable=LNC2_MAX_THREAD_COUNT" "libnetconf2" OUTPUT_VARIABLE LNC2_THREAD_COUNT)
     if(LNC2_THREAD_COUNT)
         string(STRIP ${LNC2_THREAD_COUNT} LNC2_THREAD_COUNT)
@@ -169,9 +166,6 @@ if(PKG_CONFIG_FOUND)
     else()
         message(STATUS "Unable to learn libnetconf2 thread support, check skipped")
     endif()
-
-    # sysrepo group
-    execute_process(COMMAND ${PKG_CONFIG_EXECUTABLE} "--variable=SR_GROUP" "sysrepo" OUTPUT_VARIABLE SR_GROUP OUTPUT_STRIP_TRAILING_WHITESPACE)
 else()
     message(STATUS "pkg-config not found, so it was not possible to check if libnetconf2 supports ${THREAD_COUNT} threads")
 endif()
@@ -212,7 +206,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 # dependencies - OpenSSL (required by later libnetconf2 checks and not really the server itself)
 find_package(OpenSSL)
 if(OPENSSL_FOUND)
-    list(APPEND CMAKE_REQUIRED_INCLUDES ${OPENSSL_INCLUDE_DIR})
+    list(APPEND CMAKE_REQUIRED_INCLUDES ${OPENSSL_INCLUDE_DIRS})
     list(APPEND CMAKE_REQUIRED_LIBRARIES ${OPENSSL_LIBRARIES})
 endif()
 
@@ -275,11 +269,7 @@ if(ENABLE_URL)
     find_package(CURL)
     if(CURL_FOUND)
         include_directories(${CURL_INCLUDE_DIRS})
-        if(TARGET CURL::libcurl)
-            target_link_libraries(netopeer2-server CURL::libcurl)
-        else()
-            target_link_libraries(netopeer2-server ${CURL_LIBRARIES})
-        endif()
+        target_link_libraries(netopeer2-server ${CURL_LIBRARIES})
         set(NP2SRV_URL_CAPAB 1)
     else()
         message(STATUS "libcurl not found, url capability will not be supported")

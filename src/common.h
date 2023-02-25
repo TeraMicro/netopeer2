@@ -35,6 +35,10 @@
 # define NP_CLOCK_ID CLOCK_REALTIME
 #endif
 
+/* macro for ignoring an RPC callback call */
+#define NP_IGNORE_RPC(session, event) (!sr_session_get_orig_name(session) || \
+        strcmp(sr_session_get_orig_name(session), "netopeer2") || (event == SR_EV_ABORT))
+
 /* macro to check if SR callback was originated by netopeer2 */
 #define NP_IS_ORIG_NP(session) (sr_session_get_orig_name(session) && !strcmp(sr_session_get_orig_name(session), "netopeer2"))
 
@@ -72,16 +76,6 @@ struct np2srv {
 };
 
 extern struct np2srv np2srv;
-
-/**
- * @brief Check whether to ignore an RPC callback event.
- *
- * @param[in] ev_sess Event session to generate an error for.
- * @param[in] event RPC callback event.
- * @param[out] rc Return code to return.
- * @return Whether the RPC should be processed or not.
- */
-int np_ignore_rpc(sr_session_ctx_t *ev_sess, sr_event_t event, int *rc);
 
 /**
  * @brief Sleep in milliseconds.
@@ -258,11 +252,11 @@ struct np2_filter {
  * @brief Create NP2 filter structure from a subtree filter.
  *
  * @param[in] node Subtree filter.
- * @param[in,out] ev_sess SR event session to set the error on.
- * @param[in,out] filter Generated NP2 filter.
- * @return SR error value.
+ * @param[out] filter Generated NP2 filter.
+ * @return 0 on success;
+ * @return -1 on error.
  */
-int op_filter_create_subtree(const struct lyd_node *node, sr_session_ctx_t *ev_sess, struct np2_filter *filter);
+int op_filter_create_subtree(const struct lyd_node *node, struct np2_filter *filter);
 
 /**
  * @brief Create NP2 filter structure from an XPath filter.
