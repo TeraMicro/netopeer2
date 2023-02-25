@@ -39,8 +39,6 @@
 #ifndef __LINENOISE_H
 #define __LINENOISE_H
 
-#include <stddef.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -67,7 +65,7 @@ struct linenoiseState {
     void (*hist_data_free)(void *data);
 };
 
-extern struct linenoiseState lss;
+extern struct linenoiseState ls;
 
 typedef struct linenoiseCompletions {
     int path;

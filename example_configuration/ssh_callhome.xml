@@ -27,6 +27,7 @@
                                 <supported-authentication-methods>
                                     <publickey/>
                                     <passsword/>
+                                    <other>interactive</other>
                                 </supported-authentication-methods>
                                 <users/>
                             </client-authentication>

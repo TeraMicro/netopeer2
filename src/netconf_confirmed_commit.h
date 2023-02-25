@@ -1,12 +1,11 @@
 /**
  * @file netconf_confirmed_commit.h
  * @author Tadeas Vintrlik <xvintr04@stud.fit.vutbr.cz>
- * @author Michal Vasko <mvasko@cesnet.cz>
  * @brief ietf-netconf confirmed-commit capability header
  *
  * @copyright
- * Copyright (c) 2019 - 2023 Deutsche Telekom AG.
- * Copyright (c) 2017 - 2023 CESNET, z.s.p.o.
+ * Copyright (c) 2019 - 2021 Deutsche Telekom AG.
+ * Copyright (c) 2017 - 2021 CESNET, z.s.p.o.
  *
  * This source code is licensed under BSD 3-Clause License (the "License").
  * You may not use this file except in compliance with the License.
@@ -14,9 +13,6 @@
  *
  *     https://opensource.org/licenses/BSD-3-Clause
  */
-
-#ifndef NP2SRV_NETCONF_CONFIRMED_COMMIT_H_
-#define NP2SRV_NETCONF_CONFIRMED_COMMIT_H_
 
 #include <stdint.h>
 
@@ -31,7 +27,7 @@
 void ncc_commit_ctx_destroy(void);
 
 /**
- * @brief Try and restore a previous confirmed commit after server reboot.
+ * @brief Try and restore a previous confirmed commit after server stopping.
  */
 void ncc_try_restore(void);
 
@@ -42,10 +38,10 @@ void ncc_try_restore(void);
  */
 void ncc_del_session(uint32_t nc_id);
 
-int np2srv_rpc_commit_cb(sr_session_ctx_t *session, uint32_t sub_id, const char *op_path, const struct lyd_node *input,
-        sr_event_t event, uint32_t request_id, struct lyd_node *output, void *private_data);
+int np2srv_rpc_commit_cb(sr_session_ctx_t *session, uint32_t sub_id, const char *op_path,
+        const struct lyd_node *input, sr_event_t event, uint32_t request_id,
+        struct lyd_node *output, void *private_data);
 
 int np2srv_rpc_cancel_commit_cb(sr_session_ctx_t *session, uint32_t sub_id, const char *op_path,
-        const struct lyd_node *input, sr_event_t event, uint32_t request_id, struct lyd_node *output, void *private_data);
-
-#endif /* NP2SRV_NETCONF_CONFIRMED_COMMIT_H_ */
+        const struct lyd_node *input, sr_event_t event, uint32_t request_id,
+        struct lyd_node *output, void *private_data);

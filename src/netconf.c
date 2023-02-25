@@ -16,6 +16,7 @@
 
 #define _GNU_SOURCE
 #define _DEFAULT_SOURCE
+#define _POSIX_SOURCE
 
 #include "netconf.h"
 
@@ -93,9 +94,9 @@ np2srv_rpc_get_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), const char
     sr_datastore_t ds = 0;
     const char *single_filter;
 
-    if (np_ignore_rpc(session, event, &rc)) {
+    if (NP_IGNORE_RPC(session, event)) {
         /* ignore in this case */
-        return rc;
+        return SR_ERR_OK;
     }
 
     /* get know which datastore is being affected for get-config */
@@ -131,7 +132,8 @@ np2srv_rpc_get_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), const char
         if (!meta) {
             /* subtree */
             if (((struct lyd_node_any *)node)->value_type == LYD_ANYDATA_DATATREE) {
-                if ((rc = op_filter_create_subtree(((struct lyd_node_any *)node)->value.tree, session, &filter))) {
+                if (op_filter_create_subtree(((struct lyd_node_any *)node)->value.tree, &filter)) {
+                    rc = SR_ERR_INTERNAL;
                     goto cleanup;
                 }
             }
@@ -174,7 +176,6 @@ np2srv_rpc_get_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), const char
 
     /* add output */
     if (lyd_new_any(output, NULL, "data", data_get, 1, LYD_ANYDATA_DATATREE, 1, &node)) {
-        rc = SR_ERR_LY;
         goto cleanup;
     }
     data_get = NULL;
@@ -198,9 +199,9 @@ np2srv_rpc_editconfig_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), con
     const char *defop = "merge", *testop = "test-then-set";
     int rc = SR_ERR_OK;
 
-    if (np_ignore_rpc(session, event, &rc)) {
+    if (NP_IGNORE_RPC(session, event)) {
         /* ignore in this case */
-        return rc;
+        return SR_ERR_OK;
     }
 
     /* get know which datastore is being affected */
@@ -319,9 +320,9 @@ np2srv_rpc_copyconfig_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), con
     uint8_t url = 0;
 #endif
 
-    if (np_ignore_rpc(session, event, &rc)) {
+    if (NP_IGNORE_RPC(session, event)) {
         /* ignore in this case */
-        return rc;
+        return SR_ERR_OK;
     }
 
     /* get know which datastores are affected */
@@ -496,9 +497,9 @@ np2srv_rpc_deleteconfig_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), c
     const char *trg_url = NULL;
 #endif
 
-    if (np_ignore_rpc(session, event, &rc)) {
+    if (NP_IGNORE_RPC(session, event)) {
         /* ignore in this case */
-        return rc;
+        return SR_ERR_OK;
     }
 
     /* get know which datastore is affected */
@@ -568,9 +569,9 @@ np2srv_rpc_un_lock_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), const 
     const sr_error_info_t *err_info;
     int rc = SR_ERR_OK;
 
-    if (np_ignore_rpc(session, event, &rc)) {
+    if (NP_IGNORE_RPC(session, event)) {
         /* ignore in this case */
-        return rc;
+        return SR_ERR_OK;
     }
 
     /* get know which datastore is being affected */
@@ -628,9 +629,9 @@ np2srv_rpc_kill_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), const cha
     uint32_t kill_sid, *nc_sid, i;
     int rc = SR_ERR_OK;
 
-    if (np_ignore_rpc(session, event, &rc)) {
+    if (NP_IGNORE_RPC(session, event)) {
         /* ignore in this case */
-        return rc;
+        return SR_ERR_OK;
     }
 
     lyd_find_path(input, "session-id", 0, &node);
@@ -674,9 +675,9 @@ np2srv_rpc_discard_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), const 
     struct np2_user_sess *user_sess = NULL;
     const sr_error_info_t *err_info;
 
-    if (np_ignore_rpc(session, event, &rc)) {
+    if (NP_IGNORE_RPC(session, event)) {
         /* ignore in this case */
-        return rc;
+        return SR_ERR_OK;
     }
 
     /* get the user session */
@@ -714,9 +715,9 @@ np2srv_rpc_validate_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), const
     int rc = SR_ERR_OK;
     const sr_error_info_t *err_info;
 
-    if (np_ignore_rpc(session, event, &rc)) {
+    if (NP_IGNORE_RPC(session, event)) {
         /* ignore in this case */
-        return rc;
+        return SR_ERR_OK;
     }
 
     /* get know which datastore is affected */
@@ -773,6 +774,16 @@ cleanup:
     lyd_free_siblings(config);
     np_release_user_sess(user_sess);
     return rc;
+}
+
+static LY_ERR
+np2srv_lysc_has_notif_clb(struct lysc_node *node, void *UNUSED(data), ly_bool *UNUSED(dfs_continue))
+{
+    if (node->nodetype == LYS_NOTIF) {
+        return LY_EEXIST;
+    }
+
+    return LY_SUCCESS;
 }
 
 /**
@@ -902,9 +913,9 @@ np2srv_rpc_subscribe_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), cons
     struct ly_set mod_set = {0};
     struct subscribe_ntf_arg *cb_data = NULL;
 
-    if (np_ignore_rpc(session, event, &rc)) {
-        /* ignore in this case */
-        return rc;
+    if (NP_IGNORE_RPC(session, event)) {
+        /* ignore in this case (not supported) */
+        return SR_ERR_OK;
     }
 
     /* get the NETCONF session and user session */
@@ -941,7 +952,8 @@ np2srv_rpc_subscribe_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), cons
         if (!meta) {
             /* subtree */
             if (((struct lyd_node_any *)node)->value_type == LYD_ANYDATA_DATATREE) {
-                if ((rc = op_filter_create_subtree(((struct lyd_node_any *)node)->value.tree, session, &filter))) {
+                if (op_filter_create_subtree(((struct lyd_node_any *)node)->value.tree, &filter)) {
+                    rc = SR_ERR_INTERNAL;
                     goto cleanup;
                 }
                 if ((rc = op_filter_filter2xpath(&filter, &xp))) {
@@ -1009,7 +1021,7 @@ np2srv_rpc_subscribe_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), cons
                 continue;
             }
 
-            if (np_ly_mod_has_notif(ly_mod)) {
+            if (lysc_module_dfs_full(ly_mod, np2srv_lysc_has_notif_clb, NULL) == LY_EEXIST) {
                 /* a notification was found */
                 if (ly_set_add(&mod_set, (void *)ly_mod, 1, NULL)) {
                     rc = SR_ERR_INTERNAL;
@@ -1044,6 +1056,8 @@ np2srv_rpc_subscribe_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), cons
 
     /* owned now by the callback */
     cb_data = NULL;
+
+    /* success */
 
 cleanup:
     if (rc && has_nc_ntf_status) {

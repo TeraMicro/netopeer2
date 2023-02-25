@@ -4,8 +4,9 @@ Release: {{ release }}%{?dist}
 Summary: Netopeer2 NETCONF tools suite
 Url: https://github.com/CESNET/netopeer2
 Source: %{url}/archive/v%{version}/%{name}-%{version}.tar.gz
-Source2: netopeer2-server.service
-License: BSD-3-Clause
+Source2: netopeer2-server.sysusers
+Source3: netopeer2-server.service
+License: BSD
 
 BuildRequires: gcc
 BuildRequires: cmake
@@ -18,27 +19,24 @@ BuildRequires: libssh-devel
 BuildRequires: openssl-devel
 BuildRequires: systemd-devel
 BuildRequires: systemd
+BuildRequires: systemd-rpm-macros
 
 %if 0%{?fedora}
 # c_rehash needed by CLI
 BuildRequires: openssl-perl
 %endif
 
-Requires: %{name}-server%{?_isa} = %{version}-%{release}
-Requires: %{name}-cli%{?_isa} = %{version}-%{release}
-
+Requires: netopeer2-server
+Requires: netopeer2-cli
 
 %package server
 Summary: netopeer2 NETCONF server
 
-Requires: libyang >= 2.0.231
-# needed by script merge_hostkey.sh (run in post)
-Requires: openssl
 # needed by script setup.sh (run in post)
 Requires: sysrepo-tools
-# for provided systemd units
-Requires: systemd
 
+# needed by script merge_hostkey.sh (run in post)
+Requires: openssl
 
 %package cli
 Summary: netopeer2 NETCONF CLI client
@@ -46,7 +44,6 @@ Summary: netopeer2 NETCONF CLI client
 %if 0%{?fedora}
 Requires: openssl-perl
 %endif
-
 
 %description
 Virtual package for both netopeer2-server and netopeer2-cli NETCONF tools.
@@ -66,7 +63,6 @@ the group "netconf", which is created if it does not exist.
 netopeer2-cli is a complex NETCONF command-line client with support for
 a single established NETCONF session.
 
-
 %prep
 %autosetup -p1
 
@@ -80,8 +76,16 @@ a single established NETCONF session.
 
 %install
 %cmake_install
-install -D -p -m 0644 %{SOURCE2} %{buildroot}%{_unitdir}/netopeer2-server.service
+install -D -p -m 0644 %{SOURCE2} %{buildroot}%{_sysusersdir}/netopeer2-server.conf
+install -D -p -m 0644 %{SOURCE3} %{buildroot}%{_unitdir}/netopeer2-server.service
 mkdir -p -m=700 %{buildroot}%{_libdir}/netopeer2-server
+
+%pre server
+%if 0%{?fedora}
+    %sysusers_create_compat %{SOURCE2}
+%else
+    usermod -a -G sysrepo root
+%endif
 
 %post server
 set -e
@@ -108,6 +112,7 @@ set -e
 %{_sbindir}/netopeer2-server
 %{_datadir}/man/man8/netopeer2-server.8.gz
 %{_unitdir}/netopeer2-server.service
+%{_sysusersdir}/netopeer2-server.conf
 %{_datadir}/yang/modules/netopeer2/*.yang
 %{_datadir}/netopeer2/*.sh
 %dir %{_datadir}/yang/modules/netopeer2/

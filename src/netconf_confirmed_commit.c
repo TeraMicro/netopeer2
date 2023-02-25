@@ -380,6 +380,7 @@ ncc_changes_rollback_cb(union sigval sev)
     DIR *dir = NULL;
     struct dirent *dirent = NULL;
 
+    VRB("Confirmed commit timeout reached. Restoring previous \"running\" datastore.");
     ly_ctx = sr_acquire_context(np2srv.sr_conn);
 
     /* Start a session */
@@ -490,7 +491,6 @@ ncc_del_session(uint32_t nc_id)
 
     if (commit_ctx.timer && !commit_ctx.persist && (commit_ctx.nc_id == nc_id)) {
         /* rollback */
-        VRB("Performing confirmed commit rollback after the issuing session has terminated.");
         ncc_changes_rollback_cb((union sigval)1);
     }
 
@@ -645,8 +645,8 @@ cleanup:
 void
 ncc_try_restore(void)
 {
-    time_t timestamp = 0;
-    uint32_t timeout = 0;
+    time_t timestamp = 0, end_time = 0, current = 0;
+    uint32_t timeout = 0, new_timeout = 0;
 
     /* it should be under a mutex, but since it is called in init it is not needed */
 
@@ -658,8 +658,17 @@ ncc_try_restore(void)
         return;
     }
 
-    VRB("Performing confirmed commit rollback after server restart.");
-    ncc_changes_rollback_cb((union sigval)1);
+    /* check when the confirmed commit was supposed to timeout */
+    end_time = timestamp + timeout;
+    current = time(NULL);
+    if (end_time > current) {
+        /* in the future -> compute the remaining time */
+        new_timeout = end_time - current;
+    }
+    /* else it was in the past -> should be zero */
+
+    VRB("Restoring a previous confirmed commit.");
+    ncc_commit_timeout_schedule(new_timeout);
 }
 
 /**
@@ -726,7 +735,6 @@ cleanup:
 static void
 create_meta_file(uint32_t timeout_s)
 {
-    int fd = -1;
     FILE *file = NULL;
     char *meta;
 
@@ -734,26 +742,14 @@ create_meta_file(uint32_t timeout_s)
         EMEM;
         goto cleanup;
     }
-
-    fd = open(meta, O_WRONLY | O_CREAT | O_TRUNC, 0600);
-    if (fd == -1) {
-        WRN("Failed creating confirmed commit meta file. Changes will not recover in case the server is stopped.");
-        goto cleanup;
-    }
-
-    file = fdopen(fd, "w");
+    file = fopen(meta, "w");
     if (!file) {
         WRN("Failed creating confirmed commit meta file. Changes will not recover in case the server is stopped.");
         goto cleanup;
     }
-    fd = -1;
-
     fprintf(file, "%ld\n%" PRIu32 "\n", (long)time(NULL), timeout_s);
 
 cleanup:
-    if (fd > -1) {
-        close(fd);
-    }
     if (file) {
         fclose(file);
     }
@@ -879,9 +875,9 @@ np2srv_rpc_commit_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), const c
     const sr_error_info_t *err_info;
     const char *persist_id = NULL, *persist;
 
-    if (np_ignore_rpc(session, event, &rc)) {
+    if (NP_IGNORE_RPC(session, event)) {
         /* ignore in this case */
-        return rc;
+        return SR_ERR_OK;
     }
 
     /* get the user session */
@@ -952,9 +948,9 @@ np2srv_rpc_cancel_commit_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), 
     struct lyd_node *node;
     const char *persist_id = NULL, *persist = NULL;
 
-    if (np_ignore_rpc(session, event, &rc)) {
+    if (NP_IGNORE_RPC(session, event)) {
         /* ignore in this case */
-        return rc;
+        return SR_ERR_OK;
     }
 
     /* get the NC session */
@@ -993,7 +989,6 @@ np2srv_rpc_cancel_commit_cb(sr_session_ctx_t *session, uint32_t UNUSED(sub_id), 
     }
 
     /* rollback */
-    VRB("Performing confirmed commit rollback after receiving <cancel-commit>.");
     ncc_changes_rollback_cb((union sigval)1);
 
 cleanup:
